@@ -1,0 +1,104 @@
+<html>
+<head>
+</head>
+<body style="background-color: black; color: white;">
+<script src="static/gauge.js"></script>
+<script>
+function sockOpen() {
+	console.log("Socket opened OK");
+}
+function sockClose() {
+	console.log("Socket closed OK");
+	onLoad();
+}
+function sockError(err) {
+	console.log("Socket error: " + err);
+}
+function sockMessage(msg) {
+	//console.log("Message: " + msg.data);
+	value = msg.data.substr(1);
+	iv = parseInt(value);
+	cmd = msg.data[0];
+	if (cmd == 'R') {
+		if (msg.data[1] == 'S' && msg.data[2] == 'T') {
+			todayDistance = 1;
+		}
+		bikeSpinOnce(iv);
+	} else if (cmd == 'H') {
+		console.log("heart tick: " + iv);
+	}
+}
+var distanceDiv = document.getElementById("distance");
+var totalDistanceDiv = document.getElementById("totaldistance");
+var lastBreakDiv = document.getElementById("lastbreak");
+var todayDistance = {{.Revolutions}};
+var totalDistance = {{.TotalRevolutions}};
+var speed = 0;
+var lastBreak = todayDistance;
+function bikeSpinOnce(tick) {
+	console.log("Tick: " + tick);
+	todayDistance += 1;
+	totalDistance += 1;
+	speed += 1;
+	setTimeout(function() {
+		speed -= 1;
+		if (speed == 0) {
+			setTimeout(function() {if (speed ==0) {lastBreak = todayDistance;}}, 15000);
+		}
+		render();
+	}, 5000);
+	render();
+}
+function render() {
+	// Update speed and distance. Speed is distance increase over last 60s
+	var scale = {{.Scale}};
+	distanceDiv.innerHTML = (todayDistance/scale).toFixed(2);
+	totalDistanceDiv.innerHTML = (totalDistance/scale).toFixed(2);
+	lastBreakDiv.innerHTML = ((todayDistance - lastBreak)*({{.Scale}}/1000)).toFixed(2);
+	gauge.set(speed/5);
+}
+function onLoad() {
+	distanceDiv = document.getElementById("distance");
+	totalDistanceDiv = document.getElementById("totaldistance");
+	lastBreakDiv = document.getElementById("lastbreak");
+	initGraph();
+	render();
+	webSocket = new WebSocket("ws://192.168.0.37:5432/ws", "wsc");
+	webSocket.addEventListener('open', sockOpen);
+	webSocket.addEventListener('close', sockClose);
+	webSocket.addEventListener('error', sockError);
+	webSocket.addEventListener('message', sockMessage);
+}
+var gauge = null;
+var graphOk = false;
+function initGraph() {
+	if (graphOk) { return; }
+	graphOk = true;
+var opts = {
+  angle: 0, // The span of the gauge arc
+  lineWidth: 0.2, // The line thickness
+  radiusScale: 1, // Relative radius
+  pointer: {
+    length: 0.6, // // Relative to gauge radius
+    strokeWidth: 0.031, // The thickness
+    color: '#FFF' // Fill color
+  },
+	percentColors: [[0.0, '#ff0000'], [0.3, '#f9c802'], [0.6, '#00ff00'], [0.8, '#ff0000']],
+  limitMax: true,     // If false, max value increases automatically if value > maxValue
+  limitMin: true,     // If true, the min value of the gauge will be fixed
+  colorStart: '#6FADCF',   // Colors
+  colorStop: '#8FC0DA',    // just experiment with them
+  strokeColor: '#E0E0E0',  // to see which ones work best for you
+  generateGradient: true,
+  highDpiSupport: true,     // High resolution support
+  
+};
+var target = document.getElementById('graph'); // your canvas element
+gauge = new Gauge(target).setOptions(opts); // create sexy gauge!
+gauge.maxValue = 1.8; // set max gauge value
+gauge.setMinValue(0);  // Prefer setter over gauge.minValue = 0
+gauge.animationSpeed = 5; // set animation speed (32 is default value)
+gauge.set(1.8); // set actual value
+}
+window.addEventListener('load', onLoad);
+</script>

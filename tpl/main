@@ -1,0 +1,5 @@
+<h1><span id="distance">nil</span>km today</h1>
+<h1><span id="totaldistance">nil</span>km total</h1>
+<h2><span id="lastbreak">nil</span>m since last break</h2>
+<canvas id="graph"></canvas>
+<div>Speed</div>
