@@ -6,7 +6,7 @@ import (
 	"bufio"
 	"strconv"
 	"os"
-	"os/signal"
+	//"os/signal"
 	"html/template"
 	"net/http"
 	"io/ioutil"
@@ -41,26 +41,30 @@ func main() {
 		}
 	}
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals)
+	//signal.Notify(signals)
 	go func() {
 		<-signals
-		os.Remove("rev.yaml")
-		f, err := os.Create("rev.yaml")
-		if err != nil {
-			log.Panicf("Could not open rev for dumping state: %s", err)
-		}
-		defer f.Close()
-		marshaled, err := yaml.Marshal(spun)
-		if err != nil {
-			log.Panicf("Could not dump state: %s", err)
-		}
-		f.Write(marshaled)
+		save()
 		panic("ok")
 	}()
 	webserver(":5432")
 	for {
 		openAndReadSerialForever()
 	}
+}
+
+func save() {
+	os.Remove("rev.yaml")
+	f, err := os.Create("rev.yaml")
+	if err != nil {
+		log.Panicf("Could not open rev for dumping state: %s", err)
+	}
+	defer f.Close()
+	marshaled, err := yaml.Marshal(spun)
+	if err != nil {
+		log.Panicf("Could not dump state: %s", err)
+	}
+	f.Write(marshaled)
 }
 
 func openAndReadSerialForever() {
@@ -151,6 +155,9 @@ func readMessage(txt string) {
 		}
 		spun.Revolutions += 1
 		spun.TotalRevolutions += 1
+		if spun.Revolutions % 1000 == 0 {
+			save()
+		}
 	} else if txt[0] == '!' {
 		log.Printf("Leads off.")
 	} else if txt[0] == 'H' {

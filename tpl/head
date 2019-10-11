@@ -22,6 +22,7 @@ function sockMessage(msg) {
 	if (cmd == 'R') {
 		if (msg.data[1] == 'S' && msg.data[2] == 'T') {
 			todayDistance = 1;
+			lastBreak = todayDistance;
 		}
 		bikeSpinOnce(iv);
 	} else if (cmd == 'H') {
