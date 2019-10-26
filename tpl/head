@@ -9,10 +9,11 @@ function sockOpen() {
 }
 function sockClose() {
 	console.log("Socket closed OK");
-	onLoad();
+	setTimeout(onLoad, 750);
 }
 function sockError(err) {
 	console.log("Socket error: " + err);
+	setTimeout(onLoad, 750);
 }
 function sockMessage(msg) {
 	//console.log("Message: " + msg.data);
@@ -21,7 +22,7 @@ function sockMessage(msg) {
 	cmd = msg.data[0];
 	if (cmd == 'R') {
 		if (msg.data[1] == 'S' && msg.data[2] == 'T') {
-			todayDistance = 1;
+			todayDistance = 0;
 			lastBreak = todayDistance;
 		}
 		bikeSpinOnce(iv);
@@ -38,17 +39,22 @@ var speed = 0;
 var lastBreak = todayDistance;
 function bikeSpinOnce(tick) {
 	console.log("Tick: " + tick);
-	todayDistance += 1;
-	totalDistance += 1;
-	speed += 1;
-	setTimeout(function() {
-		speed -= 1;
-		if (speed == 0) {
-			setTimeout(function() {if (speed ==0) {lastBreak = todayDistance;}}, 15000);
-		}
+	var difference = (tick-todayDistance);
+	totalDistance = totalDistance + (tick-todayDistance);
+	todayDistance = tick;
+	if (difference < 0) {
+		lastBreak = todayDistance;
+	} else if (difference > 0) {
+		speed += 1;
+		setTimeout(function() {
+			speed -= 1;
+			if (speed == 0) {
+				setTimeout(function() {if (speed ==0) {lastBreak = todayDistance;}}, 15000);
+			}
+			render();
+		}, 5000);
 		render();
-	}, 5000);
-	render();
+	}
 }
 function render() {
 	// Update speed and distance. Speed is distance increase over last 60s
@@ -64,7 +70,7 @@ function onLoad() {
 	lastBreakDiv = document.getElementById("lastbreak");
 	initGraph();
 	render();
-	webSocket = new WebSocket("ws://192.168.0.37:5432/ws", "wsc");
+	webSocket = new WebSocket("ws://192.168.0.27:5432/ws", "wsc");
 	webSocket.addEventListener('open', sockOpen);
 	webSocket.addEventListener('close', sockClose);
 	webSocket.addEventListener('error', sockError);

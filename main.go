@@ -3,10 +3,11 @@ package main
 import (
 	"log"
 	"time"
+	"fmt"
 	"bufio"
 	"strconv"
 	"os"
-	//"os/signal"
+	"os/signal"
 	"html/template"
 	"net/http"
 	"io/ioutil"
@@ -19,6 +20,7 @@ import (
 type Spun struct {
 	Scale int
 	Revolutions int64
+	LastRemoteRevolutions int64
 	TotalRevolutions int64
 	Today time.Time
 }
@@ -41,11 +43,11 @@ func main() {
 		}
 	}
 	signals := make(chan os.Signal, 1)
-	//signal.Notify(signals)
+	signal.Notify(signals, os.Interrupt)
 	go func() {
-		<-signals
+		inter := <-signals
 		save()
-		panic("ok")
+		log.Panicf("intr: %s", inter)
 	}()
 	webserver(":5432")
 	for {
@@ -78,7 +80,8 @@ func openAndReadSerialForever() {
 	scanner := bufio.NewScanner(port)
 	for scanner.Scan() {
 		txt := scanner.Text()
-		readMessage(txt)
+		b := scanner.Bytes()
+		readMessage(txt, b)
 	}
 }
 
@@ -132,18 +135,14 @@ func webMain(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "tail", nil)
 }
 
-func readMessage(txt string) {
-	sendWebSocket <- txt
+func readMessage(txt string, b []byte) {
 	value := txt[1:]
-	i, err := strconv.Atoi(value)
+	i, err := strconv.ParseInt(value, 10, 64)
 	if txt[0] == 'R' {
-		// Read a revolution, value isn't too important
 		if err != nil {
 			log.Print("Non int revolution received: %s", value)
 			return
 		}
-		log.Printf("Revolution: %d", i)
-		// check if the date changed, forcing us to reset revolutions
 		if time.Now().Day() != spun.Today.Day() {
 			log.Print("Resetting daily revolutions.")
 			spun.Today = time.Now()
@@ -153,8 +152,18 @@ func readMessage(txt string) {
 			spun.Revolutions = int64(i)
 			spun.TotalRevolutions += spun.Revolutions
 		}
-		spun.Revolutions += 1
-		spun.TotalRevolutions += 1
+		totalIncrease := int64(0)
+		if i < spun.LastRemoteRevolutions {
+			// Remote device spins have been reset, so comparison is useless
+			totalIncrease = i
+		} else {
+			totalIncrease = i-spun.LastRemoteRevolutions
+		}
+		spun.LastRemoteRevolutions = i
+		spun.Revolutions += totalIncrease
+		spun.TotalRevolutions += totalIncrease
+		log.Printf("Revolution recv: %d today: %d", i, spun.Revolutions)
+		sendWebSocket <- fmt.Sprintf("R%d", spun.Revolutions)
 		if spun.Revolutions % 1000 == 0 {
 			save()
 		}
@@ -162,5 +171,7 @@ func readMessage(txt string) {
 		log.Printf("Leads off.")
 	} else if txt[0] == 'H' {
 		log.Printf("Heart monitor update.", txt[1:])
+	} else {
+		log.Printf("Signal received: %+v", b)
 	}
 }
